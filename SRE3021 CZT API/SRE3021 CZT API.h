@@ -22,6 +22,7 @@ namespace SRE3021{
             uint8_t* pEncBuffer
         );
 	};
+	};
 	}
 	}
 }
