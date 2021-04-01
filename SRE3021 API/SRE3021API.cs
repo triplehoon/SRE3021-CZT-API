@@ -340,7 +340,7 @@ namespace HUREL.Compton.CZT
         /// </summary>
         CFG_SIG_CTRL = 0XF00F,
         /// <summary>
-        /// P 1,
+        /// addr_cfg_fixed_en
         /// </summary>
         CMD_SET_CH = 0XF010,
         /// <summary>
@@ -1128,35 +1128,39 @@ namespace HUREL.Compton.CZT
     #endregion
 
     public record SRE3021ImageData(int CathodeValue, int CathodeTiming, int[,] AnodeValue, int[,] AnodeTiming);
-    public class SRE3021API : IDisposable
+    public static class SRE3021API
     {
-        public List<SRE3021SysReg> SRE3021SysRegisters = new List<SRE3021SysReg>();
+        public static List<SRE3021SysReg> SRE3021SysRegisters = new List<SRE3021SysReg>();
 
-        public SRE3021API()
+        static SRE3021API()
         {
-            TestCode();
-
-            InitASICConfigBits();
-            OpenUDPPort();
-            OpenTCPPort();
-
+            try
+            {
+                OpenUDPPort();
+                OpenTCPPort();
+            }
+            catch
+            {
+                Trace.WriteLine("SRE3021API initializing failed");
+            }
+            InitASICConfigBits();            
         }
 
         #region Network Variables , Fuctions
-        private readonly IPAddress HostIP = IPAddress.Parse("10.10.0.100");
-        private readonly IPAddress SRE3021IP = IPAddress.Parse("10.10.0.50");
+        private static readonly IPAddress HostIP = IPAddress.Parse("10.10.0.100");
+        private static readonly IPAddress SRE3021IP = IPAddress.Parse("10.10.0.50");
         private const int SRE3021TCPPort = 50010;
         private const int SRE3021UDPPort = 50011;
         private const int MTU = 15000;
         public static int UDPPacketCount = 0;
 
-        private TcpClient TCPSocket;
+        private static TcpClient TCPSocket;
 
-        private UdpClient UDPSocket;
+        private static UdpClient UDPSocket;
 
-        private NetworkStream TCPNetworkStream;
-        private byte[] TCPNetworkStreamBuffer = new byte[15000];
-        public bool IsTCPOpen
+        private static NetworkStream TCPNetworkStream;
+        private static byte[] TCPNetworkStreamBuffer = new byte[15000];
+        public static bool IsTCPOpen
         {
             get
             {
@@ -1172,7 +1176,7 @@ namespace HUREL.Compton.CZT
             }
         }
 
-        public bool IsUDPOpen
+        public static bool IsUDPOpen
         {
             get
             {
@@ -1191,7 +1195,7 @@ namespace HUREL.Compton.CZT
         /// Try open TCP Port for SRE3021
         /// </summary>
         /// <returns>true if success</returns>
-        public bool OpenTCPPort()
+        public static bool OpenTCPPort()
         {
             if (IsTCPOpen)
             {
@@ -1200,7 +1204,9 @@ namespace HUREL.Compton.CZT
             try
             {
                 TCPSocket = new TcpClient(new IPEndPoint(HostIP, SRE3021TCPPort));
-                TCPSocket.Connect(new IPEndPoint(SRE3021IP, SRE3021TCPPort));                
+                TCPSocket.Connect(new IPEndPoint(SRE3021IP, SRE3021TCPPort));
+                
+                TCPSocket.ReceiveTimeout = 5000;
                 TCPNetworkStream = TCPSocket.GetStream();
 
             }
@@ -1228,7 +1234,7 @@ namespace HUREL.Compton.CZT
         /// Try open UDP port for SRE3021
         /// </summary>
         /// <returns>false if fail</returns>
-        public bool OpenUDPPort()
+        public static bool OpenUDPPort()
         {
             if (IsUDPOpen)
             {
@@ -1247,18 +1253,17 @@ namespace HUREL.Compton.CZT
             }
             return true;
         }
-        private  void UDPListener()
+        private static void UDPListener()
         {
-            Task.Run(async () =>
+            var epUdp = new IPEndPoint(SRE3021IP, SRE3021UDPPort);
+            Task.Run(() =>
             {             
                 while (UDPSocket != null)
                 {
-
                     //IPEndPoint object will allow us to read datagrams sent from any source.
-
-                    var receivedResults = await UDPSocket.ReceiveAsync();
-                    UDPImagBuffer.Add(receivedResults.Buffer);
-                    
+                    var receivedResults = UDPSocket.Receive(ref epUdp);
+                    UDPImagBuffer.Add(receivedResults);
+                    Thread.Sleep(0);
                 }
             });
             Task.Run(() =>
@@ -1276,12 +1281,12 @@ namespace HUREL.Compton.CZT
 
         }
 
-        private BlockingCollection<byte[]> UDPImagBuffer = new BlockingCollection<byte[]>(5000);
+        private static BlockingCollection<byte[]> UDPImagBuffer = new BlockingCollection<byte[]>();
 
         #endregion
 
         #region Setting System Regs
-        private void ReadAllSysRegs()
+        private static void ReadAllSysRegs()
         {
             CheckAPI();
 
@@ -1293,7 +1298,7 @@ namespace HUREL.Compton.CZT
 
             ReadWriteASICReg(SRE3021ASICRegisterADDR.NOTSELECT, false);
         }
-        public SRE3021SysReg ReadSysReg(SRE3021SysRegisterADDR address)
+        public static SRE3021SysReg ReadSysReg(SRE3021SysRegisterADDR address)
         {
             CheckAPI();
 
@@ -1310,7 +1315,7 @@ namespace HUREL.Compton.CZT
 
             return DecodeReadbackSysReg(checkBytes);
         }
-        public SRE3021SysReg WriteSysReg(SRE3021SysRegisterADDR address, int value)
+        public static SRE3021SysReg WriteSysReg(SRE3021SysRegisterADDR address, int value)
         {
             CheckAPI();
 
@@ -1362,7 +1367,7 @@ namespace HUREL.Compton.CZT
 
             return DecodeReadbackSysReg(checkBytes);
         }
-        private SRE3021SysReg DecodeReadbackSysReg(byte[] bytes)
+        private static SRE3021SysReg DecodeReadbackSysReg(byte[] bytes)
         {
             SRE3021PacketHeader pHeader = new SRE3021PacketHeader(bytes[0..10]);
             Debug.Assert(pHeader.PacketType == SRE3021PacketType.READBACK_SYS_REG);
@@ -1400,9 +1405,9 @@ namespace HUREL.Compton.CZT
 
         #region Setting ASIC regs
         private const int ASICBitSize = 650;
-        private bool[] ASICConfigBits = new bool[ASICBitSize];
+        private static bool[] ASICConfigBits = new bool[ASICBitSize];
 
-        private void InitASICConfigBits()
+        private static void InitASICConfigBits()
         {
             byte[] initBytes = new byte[] {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                           0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -1421,8 +1426,9 @@ namespace HUREL.Compton.CZT
                 Debug.WriteLine("{0} is {1}", ((SRE3021ASICRegisterADDR)j).ToString(), result);
             }
         }
-        public void ReadWriteASICReg(SRE3021ASICRegisterADDR addr, bool value)
+        public static void ReadWriteASICReg(SRE3021ASICRegisterADDR addr, bool value)
         {
+            CheckAPI();
             SRE3021PacketHeader pHeader = new SRE3021PacketHeader(SRE3021PacketType.RW_ASIC_REG, 85);
             byte[] data = new byte[82];
             if (addr != SRE3021ASICRegisterADDR.NOTSELECT)
@@ -1465,7 +1471,7 @@ namespace HUREL.Compton.CZT
                 }
             }
         }
-        private void DecodeReadbackASICReg(byte[] bytes)
+        private static void DecodeReadbackASICReg(byte[] bytes)
         {
             int i = 0;
             foreach (var b in bytes)
@@ -1504,7 +1510,7 @@ namespace HUREL.Compton.CZT
 
             return result;
         }
-        public bool GetASICConfigtBitValue(SRE3021ASICRegisterADDR addr)
+        public static bool GetASICConfigtBitValue(SRE3021ASICRegisterADDR addr)
         {
             return ASICConfigBits[650 - (int)addr];
         }
@@ -1512,8 +1518,8 @@ namespace HUREL.Compton.CZT
 
         #region Handle IMGDataStream
         public delegate void ReadIMGDataEventHanlder(SRE3021ImageData imageData);
-        public event ReadIMGDataEventHanlder IMGDataEventRecieved;
-        private void RaiseReadImagDataEvent(byte[] bytes)
+        public static event ReadIMGDataEventHanlder IMGDataEventRecieved;
+        private static void RaiseReadImagDataEvent(byte[] bytes)
         {
             var pHeader = new SRE3021PacketHeader(bytes[0..10]);
             if (pHeader.PacketType != SRE3021PacketType.IMG_DATA)
@@ -1531,8 +1537,8 @@ namespace HUREL.Compton.CZT
             {
                 for (int X = 0; X < 11; ++X)
                 {
-                    anodeE[X, Y] = BitConverter.ToUInt16(new byte[] { bytes[31 + imgOrder], bytes[30 + imgOrder] });
-                    anodeT[X, Y] = BitConverter.ToUInt16(new byte[] { bytes[273 + imgOrder], bytes[272 + imgOrder] });
+                    anodeE[X, Y] = (int)BitConverter.ToUInt16(new byte[] { bytes[31 + imgOrder], bytes[30 + imgOrder] }) - AnodeValueBaseline[X, Y];
+                    anodeT[X, Y] = (int)BitConverter.ToUInt16(new byte[] { bytes[273 + imgOrder], bytes[272 + imgOrder] }) - AnodeTimingBaseline[X, Y];
                     imgOrder += 2;
                     
                 }
@@ -1540,14 +1546,17 @@ namespace HUREL.Compton.CZT
             ++UDPPacketCount;
 
             SRE3021ImageData imageData = new SRE3021ImageData(catE, catT, anodeE, anodeT);
-
+            if (IMGDataEventRecieved == null)
+            {
+                return;
+            }
             IMGDataEventRecieved.Invoke(imageData);
         }
         #endregion
 
         #region BaseLine Check
 
-        public readonly int[,] ChannelNumber = 
+        public static readonly int[,] ChannelNumber = 
         {
             {3, 7, 12, 4, 20, 10, 115, 109, 114, 106, 111},
             {11, 14, 2, 18, 6, 101, 105, 98, 116, 118, 112},
@@ -1562,7 +1571,7 @@ namespace HUREL.Compton.CZT
             {28, 33, 39, 45, 51, 57, 63, 71, 73, 83, 85}
         };
 
-        public readonly int[,] ASICChannelNumber =
+        public static readonly int[,] ASICChannelNumber =
         {
             {8, 12, 17, 9, 25, 15, 122, 116, 121, 113, 118},
             {16, 19, 7, 23, 11, 108, 112, 105, 123, 125, 119},
@@ -1577,29 +1586,210 @@ namespace HUREL.Compton.CZT
             {35, 40, 46, 52, 58, 64, 70, 78, 80, 90, 92}
         };
 
-        public void CheckBaseline()
-        {
+        public static int[,] AnodeValueBaseline = new int[11, 11];
+        public static int[,] AnodeTimingBaseline = new int[11, 11];
 
+        public static bool IsBaselineSet 
+        { 
+            get 
+            { 
+                if (AnodeValueBaseline[0,0] != 0)
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            } 
+        }
+        public static void CheckBaseline()
+        {
+            int numPulses = 10000;
+            bool subtract = true;
+            bool getTAT = true;
+
+            Trace.WriteLine("Configuring ASIC.");
+            ReadWriteASICReg(SRE3021ASICRegisterADDR.Test_on, false);
+            ReadWriteASICReg(SRE3021ASICRegisterADDR.Current_compensation_enable, true);
+            
+            Trace.WriteLine("Configuring system.");
+            WriteSysReg(SRE3021SysRegisterADDR.CFG_FIXED_CH, 128); //This vale ensures that single channel readout is not envoked during baseline readout.
+            WriteSysReg(SRE3021SysRegisterADDR.CFG_HOLD_DLY, 1); //This is the minimum value for the peak-hold to pick up less noise.
+            WriteSysReg(SRE3021SysRegisterADDR.CFG_CALTRIG_EN, 1);
+
+            Trace.WriteLine("Configuring calibration pulse genenerator (CalGen).");
+            WriteSysReg(SRE3021SysRegisterADDR.CAL_PULSE_POLAR, 0);
+            WriteSysReg(SRE3021SysRegisterADDR.CAL_NUM_PULSE, numPulses);
+            WriteSysReg(SRE3021SysRegisterADDR.CAL_PULSE_LENGTH, 500);
+            WriteSysReg(SRE3021SysRegisterADDR.CAL_PULSE_INTERVAL, 40000);
+
+            Trace.WriteLine("Start pulse genenerator (CalGen).");
+
+            Stopwatch sw = new Stopwatch();            
+            IMGDataEventRecieved += BaseLineEventCheck;
+            WriteSysReg(SRE3021SysRegisterADDR.CAL_EXECUTE, 1);
+
+            sw.Start();
+
+            while (BaseLineImageEvents.Count < numPulses)
+            {
+                
+                if (sw.ElapsedMilliseconds > 15000)
+                {
+                    Trace.WriteLine($"BaseLineImageEvents Count is {BaseLineImageEvents.Count}");
+                    if (BaseLineImageEvents.Count > numPulses * 0.99)
+                    {
+                        break;
+                    }
+                    throw new TimeoutException();
+                }
+            }
+            sw.Stop();            
+            Trace.WriteLine($"Baseline Cal Execute time is {sw.ElapsedMilliseconds} [ms]");
+            IMGDataEventRecieved -= BaseLineEventCheck;
+
+            int[,] baselineSum = new int[11, 11];
+            int[,] baselineTimingSum = new int[11, 11];
+            foreach (var imageData in BaseLineImageEvents)
+            {
+                for (int i = 0; i < 11; ++i)
+                {
+                    for (int j = 0; j < 11; ++j)
+                    {
+                        baselineSum[i, j] += imageData.AnodeValue[i, j];
+                        baselineTimingSum[i, j] += imageData.AnodeTiming[i, j];
+                    }
+                }
+            }
+            for (int i = 0; i < 11; ++i)
+            {
+                for (int j = 0; j < 11; ++j)
+                {
+                    AnodeValueBaseline[i, j] = baselineSum[i,j] / BaseLineImageEvents.Count;
+                    AnodeTimingBaseline[i, j] = baselineTimingSum[i, j] / BaseLineImageEvents.Count;
+                }
+            }
+
+
+
+
+        }
+        private static List<SRE3021ImageData> BaseLineImageEvents = new List<SRE3021ImageData>();
+        private static void BaseLineEventCheck(SRE3021ImageData imageData)
+        {
+            BaseLineImageEvents.Add(imageData);
         }
 
         #endregion
 
+        #region Acquire Data
 
-
-
-
-        private void TestCode()
+        private static void SetHighVoltage(int voltage, int step, int sleepTimeInMillisecond)
         {
-            //Task.Run(() =>
-            //{
-            //    while (true)
-            //    {
-            //        RaiseReadImagDataEvent(new SRE3021ImageData(10, 10, new int[][] { new int[] { 0, 1 }, new int[] { 0, 1 } }, new int[][] { new int[] { 0, 1 }, new int[] { 0, 1 } }));
-            //        Thread.Sleep(20);
-            //    }
-            //});
+            int CurrentVoltage = (int)ReadSysReg(SRE3021SysRegisterADDR.HV_DAC).Value;
+
+            if (CurrentVoltage > voltage)
+            {
+                int setVoltage = CurrentVoltage;
+                while (voltage < (int)ReadSysReg(SRE3021SysRegisterADDR.HV_DAC).Value)
+                {
+                    if (voltage + step < CurrentVoltage)
+                    {
+                        setVoltage -= step;
+                    }
+                    else
+                    {
+                        setVoltage = voltage;
+                    }
+
+                    CurrentVoltage = (int)WriteSysReg(SRE3021SysRegisterADDR.HV_DAC, setVoltage).Value;
+                    Debug.WriteLine($"Voltage drop to {CurrentVoltage}");
+                    Thread.Sleep(sleepTimeInMillisecond);
+                }
+            }
+            else
+            {
+                int setVoltage = CurrentVoltage;
+                while (voltage > (int)ReadSysReg(SRE3021SysRegisterADDR.HV_DAC).Value)
+                {
+                    if (voltage - step > CurrentVoltage)
+                    {
+                        setVoltage += step;
+                    }
+                    else
+                    {
+                        setVoltage = voltage;
+                    }
+
+                    CurrentVoltage = (int)WriteSysReg(SRE3021SysRegisterADDR.HV_DAC, setVoltage).Value;
+                    Debug.WriteLine($"Voltage rise to {CurrentVoltage}");
+                    Thread.Sleep(sleepTimeInMillisecond);
+                }
+            }
         }
-        private void CheckAPI()
+
+        public static void StartAqusition()
+        {
+            int VTHR = 2435;
+            int VTHR0 = 2457;
+            int VFP0 = 1750;
+            ReadWriteASICReg(SRE3021ASICRegisterADDR.Test_on, false);
+            ReadWriteASICReg(SRE3021ASICRegisterADDR.Current_compensation_enable, true);
+            WriteSysReg(SRE3021SysRegisterADDR.VTHR, VTHR);
+            WriteSysReg(SRE3021SysRegisterADDR.VTHR0, VTHR0);
+            WriteSysReg(SRE3021SysRegisterADDR.VFP0, VFP0);
+            WriteSysReg(SRE3021SysRegisterADDR.CFG_PHYSTRIG_EN, 0);
+            WriteSysReg(SRE3021SysRegisterADDR.CMD_SET_CH, 0);
+            WriteSysReg(SRE3021SysRegisterADDR.CFG_CALTRIG_EN, 0);
+            WriteSysReg(SRE3021SysRegisterADDR.CFG_HOLD_DLY, 300);
+            SetHighVoltage(1500, 10, 200);
+
+
+            WriteSysReg(SRE3021SysRegisterADDR.CFG_PHYSTRIG_EN, 1);
+
+        }
+        public static void RestartAqusition()
+        {
+            WriteSysReg(SRE3021SysRegisterADDR.CFG_PHYSTRIG_EN, 0);
+            int VTHR = 2435;
+            int VTHR0 = 2457;
+            int VFP0 = 1750;
+            ReadWriteASICReg(SRE3021ASICRegisterADDR.Test_on, false);
+            ReadWriteASICReg(SRE3021ASICRegisterADDR.Current_compensation_enable, true);
+            WriteSysReg(SRE3021SysRegisterADDR.VTHR, VTHR);
+            WriteSysReg(SRE3021SysRegisterADDR.VTHR0, VTHR0);
+            WriteSysReg(SRE3021SysRegisterADDR.VFP0, VFP0);
+            WriteSysReg(SRE3021SysRegisterADDR.CFG_PHYSTRIG_EN, 0);
+            WriteSysReg(SRE3021SysRegisterADDR.CMD_SET_CH, 0);
+            WriteSysReg(SRE3021SysRegisterADDR.CFG_CALTRIG_EN, 0);
+            WriteSysReg(SRE3021SysRegisterADDR.CFG_HOLD_DLY, 300);
+            WriteSysReg(SRE3021SysRegisterADDR.CFG_PHYSTRIG_EN, 1);
+        }
+        public static void StopAqusition()
+        {
+            WriteSysReg(SRE3021SysRegisterADDR.CFG_PHYSTRIG_EN, 0);
+            SetHighVoltage(0, 10, 200);
+        }
+
+        #endregion
+
+        public static void Close()
+        {
+            Trace.WriteLine("SRE3021API Close");
+            if (TCPSocket != null)
+            {
+                TCPNetworkStream.Close();
+                TCPSocket.Close();
+            }
+            if (UDPSocket != null)
+            {
+                UDPSocket.Close();
+                UDPSocket = null;
+            }
+        }
+
+        private static void CheckAPI()
         {
             if (TCPSocket == null)
             {
@@ -1614,19 +1804,6 @@ namespace HUREL.Compton.CZT
                 throw new SocketException(2);
             }
         }
-        public void Dispose()
-        {
-            Trace.WriteLine("SRE3021API Dispose");
-            if (TCPSocket != null)
-            {
-                TCPNetworkStream.Close();
-                TCPSocket.Close();
-            }
-            if (UDPSocket != null)
-            {
-                UDPSocket.Close();
-                UDPSocket = null;
-            }
-        }
+       
     }
 }

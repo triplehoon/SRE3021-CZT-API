@@ -3,9 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.31112.23
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SRE3021 API", "SRE3021 API\SRE3021 API.csproj", "{509C5E34-75EA-4711-BE8E-1CB117709641}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SRE3021 API", "SRE3021 API\SRE3021 API.csproj", "{509C5E34-75EA-4711-BE8E-1CB117709641}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "API Test Console", "API Test Console\API Test Console.csproj", "{ED28F3BA-4384-4EC9-AADF-4724AFE452E7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "API Test Console", "API Test Console\API Test Console.csproj", "{ED28F3BA-4384-4EC9-AADF-4724AFE452E7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SRE3021 API test GUI", "SRE3021 API test GUI\SRE3021 API test GUI.csproj", "{6B0C68CB-3C76-4114-B8B4-3E671B6378F2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -41,6 +43,18 @@ Global
 		{ED28F3BA-4384-4EC9-AADF-4724AFE452E7}.Release|x64.Build.0 = Release|Any CPU
 		{ED28F3BA-4384-4EC9-AADF-4724AFE452E7}.Release|x86.ActiveCfg = Release|Any CPU
 		{ED28F3BA-4384-4EC9-AADF-4724AFE452E7}.Release|x86.Build.0 = Release|Any CPU
+		{6B0C68CB-3C76-4114-B8B4-3E671B6378F2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6B0C68CB-3C76-4114-B8B4-3E671B6378F2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6B0C68CB-3C76-4114-B8B4-3E671B6378F2}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6B0C68CB-3C76-4114-B8B4-3E671B6378F2}.Debug|x64.Build.0 = Debug|Any CPU
+		{6B0C68CB-3C76-4114-B8B4-3E671B6378F2}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6B0C68CB-3C76-4114-B8B4-3E671B6378F2}.Debug|x86.Build.0 = Debug|Any CPU
+		{6B0C68CB-3C76-4114-B8B4-3E671B6378F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6B0C68CB-3C76-4114-B8B4-3E671B6378F2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6B0C68CB-3C76-4114-B8B4-3E671B6378F2}.Release|x64.ActiveCfg = Release|Any CPU
+		{6B0C68CB-3C76-4114-B8B4-3E671B6378F2}.Release|x64.Build.0 = Release|Any CPU
+		{6B0C68CB-3C76-4114-B8B4-3E671B6378F2}.Release|x86.ActiveCfg = Release|Any CPU
+		{6B0C68CB-3C76-4114-B8B4-3E671B6378F2}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
