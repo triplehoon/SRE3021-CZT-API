@@ -18,7 +18,7 @@ namespace HUREL.Compton.CZT
     /// <summary>
     /// Packet Header. Total 10 bytes
     /// </summary>
-    public class SRE3021PacketHeader
+    internal class SRE3021PacketHeader
     {
         /// <summary>
         /// 3 bits. default 0
@@ -362,6 +362,10 @@ namespace HUREL.Compton.CZT
         RW,
         P
     }
+
+    /// <summary>
+    /// SRE3021 Sysreg API Address
+    /// </summary>
     public class SRE3021SysReg
     {
         public SRE3021SysRegisterADDR Address { get; init; }
@@ -1261,9 +1265,17 @@ namespace HUREL.Compton.CZT
                 while (UDPSocket != null)
                 {
                     //IPEndPoint object will allow us to read datagrams sent from any source.
-                    var receivedResults = UDPSocket.Receive(ref epUdp);
-                    UDPImagBuffer.Add(receivedResults);
-                    Thread.Sleep(0);
+                    try
+                    {
+                        var receivedResults = UDPSocket.Receive(ref epUdp);
+                        UDPImagBuffer.Add(receivedResults);
+                        Thread.Sleep(0);
+                    }
+                    catch
+                    {
+                        break;
+                    }
+                    
                 }
             });
             Task.Run(() =>
@@ -1287,9 +1299,7 @@ namespace HUREL.Compton.CZT
 
         #region Setting System Regs
         private static void ReadAllSysRegs()
-        {
-            CheckAPI();
-
+        {  
             SRE3021SysRegisters = new List<SRE3021SysReg>();
             foreach (SRE3021SysRegisterADDR addr in Enum.GetValues(typeof(SRE3021SysRegisterADDR)))
             {
@@ -1521,22 +1531,32 @@ namespace HUREL.Compton.CZT
         public static event ReadIMGDataEventHanlder IMGDataEventRecieved;
         private static void RaiseReadImagDataEvent(byte[] bytes)
         {
+            if (IMGDataEventRecieved == null)
+            {               
+                return;
+            }
             var pHeader = new SRE3021PacketHeader(bytes[0..10]);
             if (pHeader.PacketType != SRE3021PacketType.IMG_DATA)
             {
                 return;
             }
 
-            int catE = BitConverter.ToUInt16(new byte[] { bytes[21], bytes[20] });
-            int catT = BitConverter.ToUInt16(new byte[] { bytes[23], bytes[21] });
+            int catE = (int)BitConverter.ToUInt16(new byte[] { bytes[21], bytes[20] }) - CathodeValueBaseline;
+            int catT = (int) BitConverter.ToUInt16(new byte[] { bytes[23], bytes[22] }) - CathodeTimingBaseline;
             var anodeE = new int[11, 11];
             var anodeT = new int[11, 11];
-
+            int UnusableChannel1 = ASICChannelNumber[2, 0];
+            int UnusableChannel2 = ASICChannelNumber[0, 0];
             int imgOrder = 0;
             for (int Y = 0; Y < 11; ++Y)
             {
                 for (int X = 0; X < 11; ++X)
                 {
+                    if (Y == 0 && (X == 2 || X ==0))
+                    {
+                        imgOrder += 2;
+                        continue;
+                    }
                     anodeE[X, Y] = (int)BitConverter.ToUInt16(new byte[] { bytes[31 + imgOrder], bytes[30 + imgOrder] }) - AnodeValueBaseline[X, Y];
                     anodeT[X, Y] = (int)BitConverter.ToUInt16(new byte[] { bytes[273 + imgOrder], bytes[272 + imgOrder] }) - AnodeTimingBaseline[X, Y];
                     imgOrder += 2;
@@ -1546,10 +1566,7 @@ namespace HUREL.Compton.CZT
             ++UDPPacketCount;
 
             SRE3021ImageData imageData = new SRE3021ImageData(catE, catT, anodeE, anodeT);
-            if (IMGDataEventRecieved == null)
-            {
-                return;
-            }
+            
             IMGDataEventRecieved.Invoke(imageData);
         }
         #endregion
@@ -1585,7 +1602,8 @@ namespace HUREL.Compton.CZT
             {37, 41, 44, 50, 56, 66, 72, 76, 86, 88, 99},
             {35, 40, 46, 52, 58, 64, 70, 78, 80, 90, 92}
         };
-
+        public static int CathodeValueBaseline = 0;
+        public static int CathodeTimingBaseline = 0;
         public static int[,] AnodeValueBaseline = new int[11, 11];
         public static int[,] AnodeTimingBaseline = new int[11, 11];
 
@@ -1605,9 +1623,7 @@ namespace HUREL.Compton.CZT
         }
         public static void CheckBaseline()
         {
-            int numPulses = 10000;
-            bool subtract = true;
-            bool getTAT = true;
+            int numPulses = 10000;           
 
             Trace.WriteLine("Configuring ASIC.");
             ReadWriteASICReg(SRE3021ASICRegisterADDR.Test_on, false);
@@ -1648,11 +1664,15 @@ namespace HUREL.Compton.CZT
             sw.Stop();            
             Trace.WriteLine($"Baseline Cal Execute time is {sw.ElapsedMilliseconds} [ms]");
             IMGDataEventRecieved -= BaseLineEventCheck;
-
+            
             int[,] baselineSum = new int[11, 11];
             int[,] baselineTimingSum = new int[11, 11];
+            int catbaslineSum = 0;
+            int catTimingbaselineSum = 0;
             foreach (var imageData in BaseLineImageEvents)
             {
+                catbaslineSum += imageData.CathodeValue;
+                catTimingbaselineSum += imageData.CathodeTiming;
                 for (int i = 0; i < 11; ++i)
                 {
                     for (int j = 0; j < 11; ++j)
@@ -1662,6 +1682,8 @@ namespace HUREL.Compton.CZT
                     }
                 }
             }
+            CathodeValueBaseline = catbaslineSum / BaseLineImageEvents.Count;
+            CathodeTimingBaseline = catTimingbaselineSum / BaseLineImageEvents.Count;
             for (int i = 0; i < 11; ++i)
             {
                 for (int j = 0; j < 11; ++j)
@@ -1671,7 +1693,7 @@ namespace HUREL.Compton.CZT
                 }
             }
 
-
+            BaseLineImageEvents.Clear();
 
 
         }
@@ -1729,12 +1751,11 @@ namespace HUREL.Compton.CZT
             }
         }
 
-        public static void StartAqusition()
+        public static void StartAcqusition(int HV = 1500,  int VTHR = 2435, int VTHR0 = 2457, int Hold_DLY = 300, int VFP0 = 1750)
         {
-            int VTHR = 2435;
-            int VTHR0 = 2457;
-            int VFP0 = 1750;
+
             ReadWriteASICReg(SRE3021ASICRegisterADDR.Test_on, false);
+            ReadWriteASICReg(SRE3021ASICRegisterADDR.Test_on, false);            
             ReadWriteASICReg(SRE3021ASICRegisterADDR.Current_compensation_enable, true);
             WriteSysReg(SRE3021SysRegisterADDR.VTHR, VTHR);
             WriteSysReg(SRE3021SysRegisterADDR.VTHR0, VTHR0);
@@ -1742,8 +1763,8 @@ namespace HUREL.Compton.CZT
             WriteSysReg(SRE3021SysRegisterADDR.CFG_PHYSTRIG_EN, 0);
             WriteSysReg(SRE3021SysRegisterADDR.CMD_SET_CH, 0);
             WriteSysReg(SRE3021SysRegisterADDR.CFG_CALTRIG_EN, 0);
-            WriteSysReg(SRE3021SysRegisterADDR.CFG_HOLD_DLY, 300);
-            SetHighVoltage(1500, 10, 200);
+            WriteSysReg(SRE3021SysRegisterADDR.CFG_HOLD_DLY, Hold_DLY); //default 300
+            SetHighVoltage(HV, 10, 100);
 
 
             WriteSysReg(SRE3021SysRegisterADDR.CFG_PHYSTRIG_EN, 1);
@@ -1766,10 +1787,10 @@ namespace HUREL.Compton.CZT
             WriteSysReg(SRE3021SysRegisterADDR.CFG_HOLD_DLY, 300);
             WriteSysReg(SRE3021SysRegisterADDR.CFG_PHYSTRIG_EN, 1);
         }
-        public static void StopAqusition()
+        public static void StopAcqusition()
         {
             WriteSysReg(SRE3021SysRegisterADDR.CFG_PHYSTRIG_EN, 0);
-            SetHighVoltage(0, 10, 200);
+            SetHighVoltage(0, 10, 100);
         }
 
         #endregion
@@ -1794,6 +1815,7 @@ namespace HUREL.Compton.CZT
             if (TCPSocket == null)
             {
                 throw new SocketException(0);
+
             }
             if (UDPSocket == null)
             {

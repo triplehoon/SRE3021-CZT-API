@@ -15,29 +15,98 @@ namespace API_Test_Console
     {
         static void Main(string[] args)
         {
-            var CZTAPI = new SRE3021API();
-            CZTAPI.StopAqusition();
-            CZTAPI.CheckBaseline();
-
+            //SRE3021API.StopAcqusition();
+            Console.WriteLine($"Start");
+            SRE3021API.CheckBaseline();
             for (int i = 0; i < 11; ++i)
             {
                 for (int j = 0; j < 11; ++j)
                 {
-                    Console.WriteLine($"X: {i}, Y: {j}, Baseline {CZTAPI.AnodeValueBaseline[i, j]} // TimingBaseline{CZTAPI.AnodeTimingBaseline[i, j]}");
+                    Console.WriteLine($"X: {i}, Y: {j}, Baseline {SRE3021API.AnodeValueBaseline[i, j]} // TimingBaseline{SRE3021API.AnodeTimingBaseline[i, j]}");
 
                 }
             }
+            
+            SRE3021API.IMGDataEventRecieved += ProcessImgData;
+
+            int aTime = 1;
+            StratSREAcqusition("Cs137default", aTime);
+            SRE3021API.StopAcqusition();
+
+            for (int i = 1000; i <= 2000; i+=100)
+            {
+                StratSREAcqusition("Cs137_HVChanged", aTime, i);
+            }
+            SRE3021API.StopAcqusition();
+
+            for (int i = 2300; i <= 2700; i += 50)
+            {
+                StratSREAcqusition("VTHR_Changed", aTime, 1500, i);
+            }
+
+            for (int i = 2300; i <= 2700; i += 50)
+            {
+                StratSREAcqusition("VTHR0_Changed", aTime, 1500, 2435, i);
+            }
+
+            for (int i = 300; i <= 1500; i += 200)
+            {
+                StratSREAcqusition("Hold_DLY_Changed", aTime, 1500, 2435, 2457, i);
+            }
+            Console.WriteLine($"{StratSREAcqusitionCount} minutes takes");
+
+
+            SRE3021API.StopAcqusition();
+            Thread.Sleep(500);
+
+            SRE3021API.Close();
+        }
+        static int DataCount = 0;
+        static int DoubleScatterCount = 0;
+        static BlockingCollection<List<int>> Data = new BlockingCollection<List<int>>();
+        static void ProcessImgData(SRE3021ImageData imgData)
+        {
+            List<int> ReturnValues = new List<int>();
+
+            ReturnValues.Add(imgData.CathodeValue);
+            ReturnValues.Add(imgData.CathodeTiming);
+            for (int X = 0; X < 11; ++X)
+            {
+                for(int Y = 0; Y < 11; ++Y)
+                {
+                    ReturnValues.Add(X);
+                    ReturnValues.Add(Y);
+                    ReturnValues.Add(imgData.AnodeValue[X, Y]);
+                    ReturnValues.Add(imgData.AnodeTiming[X, Y]);
+
+
+                }
+            }
+            
+
+            Data.Add(ReturnValues);
+            ++DataCount;
+            if (DataCount % 1000 == 0)
+            {
+                Console.WriteLine("DataCount {0}, {1}", DataCount, DoubleScatterCount);
+            }
+            
+        }
+
+        static int StratSREAcqusitionCount = 0;
+        static void StratSREAcqusition(string fileName, int acqusitionMin, int HV = 1500,  int VTHR = 2435, int VTHR0 = 2457, int Hold_DLY = 300, int VFP0 = 1750)
+        {
             bool DoneTryTake = false;
-            CZTAPI.IMGDataEventRecieved += ProcessImgData;
+            string savePath = DateTime.Now.ToString("yyyyMMdd_HHmm_") + fileName + "_" + acqusitionMin + "min_" + HV + "_HV_" + VTHR + "_VTHR_" + VTHR0 + "_VTHR0_" + Hold_DLY + "_HOLD_DLY_" + VFP0 + "_VFP0" + ".csv";
+            bool IsAcqusitionRunning = true;
             Task.Run(() =>
             {
                 Stopwatch sw = new Stopwatch();
                 sw.Start();
-                string savePath ="Ba_SimpleSum3_60s" + ".csv";
-                while (true)
-                { 
-                    int item;
-                    using (StreamWriter outputFile = new StreamWriter(savePath, true))
+                while (IsAcqusitionRunning)
+                {
+                    List<int> item;
+                    using (StreamWriter outputFile = new StreamWriter("log\\"+savePath, true))
                     {
                         while (Data.TryTake(out item))
                         {
@@ -47,70 +116,35 @@ namespace API_Test_Console
 
                             outputFile.Write(sw.ElapsedMilliseconds);
                             outputFile.Write(",");
-                            outputFile.WriteLine(item);
-                        
+                            foreach (int i in item)
+                            {
+                                outputFile.Write(i);
+                                outputFile.Write(",");
+                            }
+                            outputFile.WriteLine();
+
                         }
                     }
                     DoneTryTake = true;
 
                 }
             });
-            CZTAPI.StartAqusition();
-            Thread.Sleep(1000 * 10);
+            SRE3021API.StartAcqusition(HV, VTHR, VTHR0, Hold_DLY, VFP0);
+            Console.WriteLine($"{savePath}Acqusition Start");
+            for (int i = 0; i < acqusitionMin; ++i)
+            {
+                Thread.Sleep(1000 * 60);
+                Console.WriteLine($"{i + 1} min passed. Total {acqusitionMin}");
+            }
 
-            CZTAPI.WriteSysReg(SRE3021SysRegisterADDR.CFG_PHYSTRIG_EN, 0);
-            CZTAPI.StopAqusition();
+
+            SRE3021API.WriteSysReg(SRE3021SysRegisterADDR.CFG_PHYSTRIG_EN, 0);
             while (!DoneTryTake)
             {
+                Console.WriteLine("Still Writing");
                 Thread.Sleep(1000);
             }
-        }
-        static int DataCount = 0;
-        static int DoubleScatterCount = 0;
-        static BlockingCollection<int> Data = new BlockingCollection<int>();
-        static void ProcessImgData(SRE3021ImageData imgData)
-        {
-            int max = -500;
-            int Xmax = 0;
-            int Ymax = 0;
-            for(int X = 0; X < 11; ++X)
-            {
-                for(int Y = 0; Y < 11; ++Y)
-                {
-                    if (imgData.AnodeValue[X,Y] > max)
-                    {
-                        max = imgData.AnodeValue[X, Y];
-                        Xmax = X;
-                        Ymax = Y;   
-                    }
-                }
-            }
-            /// Simple Sum
-            int trueMax;
-            if (Xmax > 0 && Xmax < 10)
-            {
-                if (Ymax > 0 && Ymax < 10)
-                {
-                    
-                }
-                else
-                {
-                    return;
-                }
-            }
-            else
-            {
-                return;
-            }
-
-
-            Data.Add(trueMax);
-            ++DataCount;
-            if (DataCount % 1000 == 0)
-            {
-                Console.WriteLine("Max is {0}: {1} // {2}", trueMax, DataCount, DoubleScatterCount);
-            }
-            
+            IsAcqusitionRunning = false;
         }
     }
 }
