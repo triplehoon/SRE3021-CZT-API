@@ -6,10 +6,46 @@
         xmlns:local="clr-namespace:SRE3021_API_test_GUI"
         xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
         mc:Ignorable="d"
-        Title="MainWindow" Height="800" Width="800">
+        Title="CZT Sepectrometer" Height="600" Width="800">
     <Window.DataContext>
         <local:MainViewModel/>
     </Window.DataContext>
+    <Window.Resources>
+        <ResourceDictionary>
+            <Style TargetType="TextBlock" x:Key="TextBlockTitle">
+                <Setter Property="FontSize" Value="20"/>
+                <Setter Property="FontWeight" Value="Bold"/>
+            </Style>
+            <Style TargetType="TextBlock" x:Key="TextBlockTitle2">
+                <Setter Property="FontSize" Value="16"/>
+                <Setter Property="Foreground" Value="Black"/>
+            </Style>
+
+            <Style TargetType="TextBlock" x:Key="TextBlockContentBold">
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="FontWeight" Value="Bold"/>
+            </Style>
+            <Style TargetType="TextBlock" x:Key="TextBlockContent">
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="FontWeight" Value="Normal"/>
+            </Style>
+            <Style TargetType="{x:Type Button}" x:Key="defaultButtonStyle">
+
+            </Style>
+            <Style TargetType="{x:Type Button}" x:Key="ButtonDesignHYU" BasedOn="{StaticResource defaultButtonStyle}">
+                <Setter Property="Background" Value="#FF00457E"/>
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="Padding" Value="5"/>
+                <Setter Property="FontWeight" Value="Bold"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Style.Resources>
+                    <Style TargetType="Border">
+                        <Setter Property="CornerRadius" Value="5"/>
+                    </Style>
+                </Style.Resources>
+            </Style>
+        </ResourceDictionary>
+    </Window.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
@@ -17,10 +53,37 @@
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="6*"/>
         </Grid.RowDefinitions>
-        <StackPanel Grid.Row="0" Grid.Column="0">
-            
+
+        <Image x:Name="image" Height="98" Width="275" Source="/symbol_hurel.png" HorizontalAlignment="Left" Margin="5"/>
+
+        <TextBlock Style="{StaticResource TextBlockTitle}" Grid.Row="0" Grid.Column="1" Margin="20,5,5,5" Text="CZT Spectrometer" FontSize="45" VerticalAlignment="Center" Foreground="#FF00457E"/>
+
+
+        <StackPanel Grid.Row="1" Grid.Column="0">
+            <Button Style="{StaticResource ButtonDesignHYU}" Content="Start Acqusition" Margin="5" VerticalAlignment="Center" Command="{Binding StartCZTCommmand}"/>
+            <Button Style="{StaticResource ButtonDesignHYU}" Content="Stop Acqusition" Margin="5" VerticalAlignment="Center" Command="{Binding StopCZTCommmand}"/>
+            <Button Style="{StaticResource ButtonDesignHYU}" Content="Reset Spectrum" Margin="5" VerticalAlignment="Center" Command="{Binding ResetSpectrumCommand}"/>
+            <TextBlock Text="Data Count" Style="{StaticResource TextBlockContentBold}" Margin="5"/>
+            <TextBlock Text="{Binding DataCount}" Margin="5"/>
+            <TextBlock Text="{Binding Message}" Margin="5"/>
         </StackPanel>
+
+        <syncfusion:SfChart  x:Name="SpectrumMain" Margin="5" Grid.Row="1" Grid.Column="1">
+            <syncfusion:SfChart.PrimaryAxis>
+                <syncfusion:NumericalAxis Minimum="0" Maximum="1500" ShowTrackBallInfo="True" Header="Energy"/>
+            </syncfusion:SfChart.PrimaryAxis>
+            <syncfusion:SfChart.SecondaryAxis>
+                <syncfusion:NumericalAxis Minimum="0" Header="Count"/>
+            </syncfusion:SfChart.SecondaryAxis>
+            <syncfusion:FastColumnBitmapSeries Interior="Black"
+                                                                     ListenPropertyChange="True"
+                                                                     Label="Energy"
+                                                                     ItemsSource="{Binding SpectrumHisto}" 
+                                                                     XBindingPath="Energy" 
+                                                                     YBindingPath="Count"
+                                                                     syncfusion:ChartSeriesBase.Spacing="0" />
+        </syncfusion:SfChart>
     </Grid>
 </Window>

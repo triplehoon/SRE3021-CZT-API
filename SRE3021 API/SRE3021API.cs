@@ -1209,9 +1209,10 @@ namespace HUREL.Compton.CZT
             {
                 TCPSocket = new TcpClient(new IPEndPoint(HostIP, SRE3021TCPPort));
                 TCPSocket.Connect(new IPEndPoint(SRE3021IP, SRE3021TCPPort));
-                
+                TCPSocket.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                 TCPSocket.ReceiveTimeout = 5000;
                 TCPNetworkStream = TCPSocket.GetStream();
+                TCPSocket.Client.LingerState = new LingerOption(false, 0);
 
             }
             catch (Exception e)
@@ -1707,7 +1708,7 @@ namespace HUREL.Compton.CZT
 
         #region Acquire Data
 
-        private static void SetHighVoltage(int voltage, int step, int sleepTimeInMillisecond)
+        public static int SetHighVoltage(int voltage, int step, int sleepTimeInMillisecond)
         {
             int CurrentVoltage = (int)ReadSysReg(SRE3021SysRegisterADDR.HV_DAC).Value;
 
@@ -1749,6 +1750,7 @@ namespace HUREL.Compton.CZT
                     Thread.Sleep(sleepTimeInMillisecond);
                 }
             }
+            return CurrentVoltage;
         }
 
         public static void StartAcqusition(int HV = 1500,  int VTHR = 2435, int VTHR0 = 2457, int Hold_DLY = 300, int VFP0 = 1750)
