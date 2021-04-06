@@ -1208,8 +1208,8 @@ namespace HUREL.Compton.CZT
             try
             {
                 TCPSocket = new TcpClient(new IPEndPoint(HostIP, SRE3021TCPPort));
-                TCPSocket.Connect(new IPEndPoint(SRE3021IP, SRE3021TCPPort));
                 TCPSocket.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                TCPSocket.Connect(new IPEndPoint(SRE3021IP, SRE3021TCPPort));
                 TCPSocket.ReceiveTimeout = 5000;
                 TCPNetworkStream = TCPSocket.GetStream();
                 TCPSocket.Client.LingerState = new LingerOption(false, 0);
