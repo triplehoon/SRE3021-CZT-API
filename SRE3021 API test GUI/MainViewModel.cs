@@ -165,23 +165,23 @@ namespace SRE3021_API_test_GUI
 
         static void ProcessImgData(SRE3021ImageData imgData)
         {
-            int interactionX = -1;
-            int interactionY = -1;
+            List<int> interactionX = new List<int>();
+            List<int> interactionY = new List<int>();
             int interactionPotins = 0;
             int backgroundNoise = 0;
             for (int X = 0; X < 11; ++X)
             {
                 for (int Y = 0; Y < 11; ++Y)
                 {
-                    if (imgData.AnodeTiming[X, Y] > 50)
+                    if (imgData.AnodeTiming[X, Y] > 100)
                     {
                         ++interactionPotins;
-                        if (interactionPotins == 2) 
+                        if (interactionPotins == 4) 
                         {
                             return;
                         }
-                        interactionX = X;
-                        interactionY = Y;
+                        interactionX.Add(X);
+                        interactionY.Add(Y);
                     }
                     else
                     {
@@ -190,13 +190,50 @@ namespace SRE3021_API_test_GUI
                     
                 }
             }
-            if (interactionX == -1)
+            if (interactionX.Count == 0)
             {
                 return;
             }
-            backgroundNoise = backgroundNoise / 118;
+            else if (interactionX.Count == 1)
+            {
+                backgroundNoise = backgroundNoise / 120;
 
-            SpectrumEnergy.AddEnergy(imgData.AnodeValue[interactionX, interactionY] * p1 + p2);
+                SpectrumEnergy.AddEnergy((imgData.AnodeValue[interactionX[0], interactionY[0]] - backgroundNoise) * p1 + p2);
+            }
+            else if (interactionX.Count == 2)
+            {
+                if (interactionX[0] == 0 || interactionX[1] == 10 || interactionY[0] == 0 || interactionY[1] == 10)
+                {
+                    return;
+                }
+                //int xdist = Math.Abs(interactionX[0] - interactionX[1]);
+                //int yidst = Math.Abs(interactionY[0] - interactionY[1]);
+                //if (xdist * xdist + yidst * yidst <= 1)
+                //{
+                //    return;
+                //}
+                backgroundNoise = backgroundNoise / 119;
+
+                SpectrumEnergy.AddEnergy((imgData.AnodeValue[interactionX[0], interactionY[0]] + imgData.AnodeValue[interactionX[1], interactionY[1]] - 2 * backgroundNoise) * p1 + p2);
+
+            }
+            //else if (interactionX.Count == 3)
+            //{
+            //    if (interactionX[0] == 0 || interactionX[1] == 10 || interactionY[0] == 0 || interactionY[1] == 10)
+            //    {
+            //        return;
+            //    }
+            //    int xdist = Math.Abs(interactionX[0] - interactionX[1]);
+            //    int yidst = Math.Abs(interactionY[0] - interactionY[1]);
+            //    if (xdist * xdist + yidst * yidst <= 1)
+            //    {
+            //        return;
+            //    }
+            //    backgroundNoise = backgroundNoise / 118;
+
+            //    SpectrumEnergy.AddEnergy((imgData.AnodeValue[interactionX[0], interactionY[0]] + imgData.AnodeValue[interactionX[1], interactionY[1]] + imgData.AnodeValue[interactionX[2], interactionY[2]] - 3 * backgroundNoise) * p1 + p2);
+
+            //}
 
             DataCountStatic++;
         }
@@ -216,7 +253,7 @@ namespace SRE3021_API_test_GUI
             }
         }
 
-        static private SpectrumEnergy SpectrumEnergy = new SpectrumEnergy(2, 1500);
+        static private SpectrumEnergy SpectrumEnergy = new SpectrumEnergy(0.5, 1500);
 
         private ObservableCollection<HistoEnergy> spectrumHisto = new ObservableCollection<HistoEnergy>();
         public ObservableCollection<HistoEnergy> SpectrumHisto
@@ -251,7 +288,7 @@ namespace SRE3021_API_test_GUI
 
         private List<double> EnergyBin = new List<double>();
 
-        public SpectrumEnergy(int binSize, double MaxEnergy)
+        public SpectrumEnergy(double binSize, double MaxEnergy)
         {
             int binCount = (int)(MaxEnergy / binSize);
             for (int i = 0; i < binCount; ++i)
