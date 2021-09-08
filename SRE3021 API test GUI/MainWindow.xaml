@@ -75,7 +75,7 @@
                 <syncfusion:NumericalAxis Minimum="0" Maximum="1500" ShowTrackBallInfo="True" Header="Energy"/>
             </syncfusion:SfChart.PrimaryAxis>
             <syncfusion:SfChart.SecondaryAxis>
-                <syncfusion:NumericalAxis Minimum="0" Header="Count"/>
+                <syncfusion:LogarithmicAxis Minimum="0" Header="Count"/>
             </syncfusion:SfChart.SecondaryAxis>
             <syncfusion:FastColumnBitmapSeries Interior="Black"
                                                                      ListenPropertyChange="True"

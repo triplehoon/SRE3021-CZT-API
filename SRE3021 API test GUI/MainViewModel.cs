@@ -35,7 +35,6 @@ namespace SRE3021_API_test_GUI
                 }
             }
 
-           
 
 
         }
@@ -173,10 +172,10 @@ namespace SRE3021_API_test_GUI
             {
                 for (int Y = 0; Y < 11; ++Y)
                 {
-                    if (imgData.AnodeTiming[X, Y] > 100)
+                    if (imgData.AnodeTiming[X, Y] > 150)
                     {
                         ++interactionPotins;
-                        if (interactionPotins == 4) 
+                        if (interactionPotins == 3) 
                         {
                             return;
                         }
@@ -198,23 +197,24 @@ namespace SRE3021_API_test_GUI
             {
                 backgroundNoise = backgroundNoise / 120;
 
-                SpectrumEnergy.AddEnergy((imgData.AnodeValue[interactionX[0], interactionY[0]] - backgroundNoise) * p1 + p2);
+                SpectrumEnergy.AddEnergy((Convert.ToDouble(imgData.AnodeValue[interactionX[0], interactionY[0]]) - backgroundNoise) * p1 + p2);
             }
             else if (interactionX.Count == 2)
             {
-                if (interactionX[0] == 0 || interactionX[1] == 10 || interactionY[0] == 0 || interactionY[1] == 10)
-                {
-                    return;
-                }
-                //int xdist = Math.Abs(interactionX[0] - interactionX[1]);
-                //int yidst = Math.Abs(interactionY[0] - interactionY[1]);
-                //if (xdist * xdist + yidst * yidst <= 1)
+                return;
+                //if (interactionX[0] == 0 || interactionX[1] == 10 || interactionY[0] == 0 || interactionY[1] == 10)
                 //{
                 //    return;
                 //}
-                backgroundNoise = backgroundNoise / 119;
+                ////int xdist = Math.Abs(interactionX[0] - interactionX[1]);
+                ////int yidst = Math.Abs(interactionY[0] - interactionY[1]);
+                ////if (xdist * xdist + yidst * yidst <= 1)
+                ////{
+                ////    return;
+                ////}
+                //backgroundNoise = backgroundNoise / 119;
 
-                SpectrumEnergy.AddEnergy((imgData.AnodeValue[interactionX[0], interactionY[0]] + imgData.AnodeValue[interactionX[1], interactionY[1]] - 2 * backgroundNoise) * p1 + p2);
+                //SpectrumEnergy.AddEnergy((imgData.AnodeValue[interactionX[0], interactionY[0]] + imgData.AnodeValue[interactionX[1], interactionY[1]] - 2 * backgroundNoise) * p1 + p2);
 
             }
             //else if (interactionX.Count == 3)
@@ -253,7 +253,7 @@ namespace SRE3021_API_test_GUI
             }
         }
 
-        static private SpectrumEnergy SpectrumEnergy = new SpectrumEnergy(0.5, 1500);
+        static private SpectrumEnergy SpectrumEnergy = new SpectrumEnergy(3, 1500);
 
         private ObservableCollection<HistoEnergy> spectrumHisto = new ObservableCollection<HistoEnergy>();
         public ObservableCollection<HistoEnergy> SpectrumHisto

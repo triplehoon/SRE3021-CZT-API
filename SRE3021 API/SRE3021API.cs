@@ -1138,15 +1138,10 @@ namespace HUREL.Compton.CZT
 
         static SRE3021API()
         {
-            try
-            {
-                OpenUDPPort();
-                OpenTCPPort();
-            }
-            catch
-            {
-                Trace.WriteLine("SRE3021API initializing failed");
-            }
+            
+            OpenUDPPort();
+            ReadAllSysRegs();
+
             InitASICConfigBits();            
         }
 
@@ -1205,24 +1200,26 @@ namespace HUREL.Compton.CZT
             {
                 return true;
             }
+           
+            TCPSocket = new TcpClient();
+            TCPSocket.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            LingerOption lo = new LingerOption(true, 0);
+            TCPSocket.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Linger, lo);
+            TCPSocket.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveTimeout, 500);
+
+
             try
             {
-                TCPSocket = new TcpClient(new IPEndPoint(HostIP, SRE3021TCPPort));
-                TCPSocket.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.DontLinger, false);
-                TCPSocket.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-                TCPSocket.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveTimeout, 500);
                 TCPSocket.Connect(new IPEndPoint(SRE3021IP, SRE3021TCPPort));
-                TCPSocket.ReceiveTimeout = 5000;
-                TCPNetworkStream = TCPSocket.GetStream();
-
             }
-            catch (Exception e)
+            catch(SocketException e)
             {
-                Trace.WriteLine(e.ToString());
-                Trace.WriteLine("TCP Connection Fail");
-                TCPSocket = null;
-                return false;
+                Trace.Write(e);
+                Trace.WriteLine("No Connection");
             }
+
+            TCPNetworkStream = TCPSocket.GetStream();
+
 
             if (!TCPSocket.Connected)
             {
@@ -1231,8 +1228,6 @@ namespace HUREL.Compton.CZT
                 TCPSocket = null;
                 return false;
             }
-            ReadAllSysRegs();
-
             return true;
         }
 
@@ -1312,6 +1307,7 @@ namespace HUREL.Compton.CZT
         }
         public static SRE3021SysReg ReadSysReg(SRE3021SysRegisterADDR address)
         {
+            OpenTCPPort();
             CheckAPI();
 
             SRE3021PacketHeader pHeader = new SRE3021PacketHeader(SRE3021PacketType.READ_SYS_REG, 2);
@@ -1324,11 +1320,13 @@ namespace HUREL.Compton.CZT
             TCPNetworkStream.Flush();
             byte[] checkBytes = new byte[MTU];
             TCPNetworkStream.Read(checkBytes, 0, MTU);
-
+            CloseTCPPort();
             return DecodeReadbackSysReg(checkBytes);
         }
         public static SRE3021SysReg WriteSysReg(SRE3021SysRegisterADDR address, int value)
         {
+
+            OpenTCPPort();
             CheckAPI();
 
             if (SRE3021SysReg.CheckType(address) == RWType.R)
@@ -1376,7 +1374,7 @@ namespace HUREL.Compton.CZT
             TCPNetworkStream.Write(sendData.ToArray(), 0, sendData.Count);
             TCPNetworkStream.Flush();
             TCPNetworkStream.Read(checkBytes, 0, MTU);
-
+            CloseTCPPort();
             return DecodeReadbackSysReg(checkBytes);
         }
         private static SRE3021SysReg DecodeReadbackSysReg(byte[] bytes)
@@ -1440,6 +1438,7 @@ namespace HUREL.Compton.CZT
         }
         public static void ReadWriteASICReg(SRE3021ASICRegisterADDR addr, bool value)
         {
+            OpenTCPPort();
             CheckAPI();
             SRE3021PacketHeader pHeader = new SRE3021PacketHeader(SRE3021PacketType.RW_ASIC_REG, 85);
             byte[] data = new byte[82];
@@ -1482,6 +1481,8 @@ namespace HUREL.Compton.CZT
                     throw new Exception("ASIC Config Failed");
                 }
             }
+
+            CloseTCPPort();
         }
         private static void DecodeReadbackASICReg(byte[] bytes)
         {
@@ -1813,21 +1814,31 @@ namespace HUREL.Compton.CZT
             }
         }
 
+        public static void CloseTCPPort()
+        {
+            if (TCPSocket != null)
+            {
+                TCPNetworkStream.Close();
+                TCPSocket.Close();
+                TCPSocket = null;
+            }   
+        }
+
         private static void CheckAPI()
         {
-            if (TCPSocket == null)
-            {
-                throw new SocketException(0);
+            //if (TCPSocket == null)
+            //{
+            //    throw new SocketException(0);
 
-            }
-            if (UDPSocket == null)
-            {
-                throw new SocketException(1);
-            }
-            if (TCPNetworkStream == null)
-            {
-                throw new SocketException(2);
-            }
+            //}
+            //if (UDPSocket == null)
+            //{
+            //    throw new SocketException(1);
+            //}
+            //if (TCPNetworkStream == null)
+            //{
+            //    throw new SocketException(2);
+            //}
         }
        
     }
