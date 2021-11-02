@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Threading;
 using AsyncAwaitBestPractices.MVVM;
+using HUREL.Compton;
 using HUREL.Compton.CZT;
 
 namespace SRE3021_API_test_GUI
@@ -18,25 +20,12 @@ namespace SRE3021_API_test_GUI
 
         public MainViewModel()
         {
-            if (SRE3021API.IsTCPOpen && SRE3021API.IsUDPOpen)
-            {
-                Trace.WriteLine("SRE3021 Loading Successs");
-            }
+            SRE3021API.InitiateSRE3021API();
 
-            SRE3021API.IMGDataEventRecieved += ProcessImgData;
+            SRE3021API.IMGDataEventRecieved += ProcessImgDataSaving;
+            SRE3021API.ReadWriteASICReg(SRE3021ASICRegisterADDR.Anode_Channel_3_Disable, true);
 
-            SRE3021API.CheckBaseline();
-            for (int i = 0; i < 11; ++i)
-            {
-                for (int j = 0; j < 11; ++j)
-                {
-                    Debug.WriteLine($"X: {i}, Y: {j}, Baseline {SRE3021API.AnodeValueBaseline[i, j]} // TimingBaseline{SRE3021API.AnodeTimingBaseline[i, j]}");
-
-                }
-            }
-
-
-
+            SRE3021API.ReadWriteASICReg(SRE3021ASICRegisterADDR.Anode_Channel_1_Disable, true);
         }
 
         private AsyncCommand startCZTCommmand;
@@ -51,6 +40,7 @@ namespace SRE3021_API_test_GUI
 
         private async Task StartCZT()
         {
+            ListModeData.Clear();
             await Task.Run(() =>
             {
                 Message = "Starting CZT";
@@ -73,7 +63,7 @@ namespace SRE3021_API_test_GUI
                         Thread.Sleep(1);
                         DataCount = DataCountStatic;
                     }                    
-                    SpectrumHisto = new ObservableCollection<HistoEnergy>(SpectrumEnergy.HistoEnergies);
+                    SpectrumHisto = new ObservableCollection<HistoEnergy>(SRE3021API.GetSpectrumEnergy.HistoEnergies);
                 }
             });
             
@@ -90,8 +80,23 @@ namespace SRE3021_API_test_GUI
             return IsCZTRunning;
         }
 
+        private string fileName = "test.csv";
+        public string FileName
+        {
+            get
+            {
+                return fileName;
+            }
+            set
+            {
+                FileName = value;
+                OnPropertyChanged(nameof(FileName));
+            }
+        }
+
         private async Task StopCZT()
         {
+           
             await Task.Run(() =>
             {
                 IsCZTRunning = false;
@@ -104,7 +109,36 @@ namespace SRE3021_API_test_GUI
                         StartCZTCommmand.RaiseCanExecuteChanged();
                         StopCZTCommmand.RaiseCanExecuteChanged();
                     }));
-            
+            Message = "Saving start...";
+            using (System.IO.StreamWriter file = new System.IO.StreamWriter(FileName))
+            {
+                //int CathodeValue, int CathodeTiming, int[,] AnodeValue, int[,] AnodeTiming);
+                file.Write("CathodeValue, CathodeTiming,");
+                for (int x = 0; x < 11; ++x)
+                {
+                    for (int y = 0; y < 11; ++y)
+                    {
+                        file.Write($"AnodeValue({x}.{y}),");
+                        file.Write($"AnodeTiming({x}.{y}),");
+                    }
+                }
+                file.WriteLine();
+                foreach (SRE3021ImageData lmd in ListModeData)
+                {
+                    file.Write($"{lmd.CathodeValue},");
+                    file.Write($"{lmd.CathodeTiming},");
+                    for (int x = 0; x < 11; ++x)
+                    {
+                        for (int y = 0; y < 11; ++y)
+                        {
+                            file.Write($"{lmd.AnodeValue[x,y]},");
+                            file.Write($"{lmd.AnodeTiming[x, y]},");
+                        }
+                    }
+                    file.WriteLine();
+                }
+            }
+            Message = "Save done";
         }
 
         private AsyncCommand resetSpectrumCommand;
@@ -161,80 +195,11 @@ namespace SRE3021_API_test_GUI
                 OnPropertyChanged(nameof(Message));
             }
         }
-
-        static void ProcessImgData(SRE3021ImageData imgData)
+        static private List<string> Edata = new List<string>();
+        static private List<SRE3021ImageData> ListModeData = new List<SRE3021ImageData>();
+        static void ProcessImgDataSaving(SRE3021ImageData imgData)
         {
-            List<int> interactionX = new List<int>();
-            List<int> interactionY = new List<int>();
-            int interactionPotins = 0;
-            int backgroundNoise = 0;
-            for (int X = 0; X < 11; ++X)
-            {
-                for (int Y = 0; Y < 11; ++Y)
-                {
-                    if (imgData.AnodeTiming[X, Y] > 150)
-                    {
-                        ++interactionPotins;
-                        if (interactionPotins == 3) 
-                        {
-                            return;
-                        }
-                        interactionX.Add(X);
-                        interactionY.Add(Y);
-                    }
-                    else
-                    {
-                        backgroundNoise += imgData.AnodeValue[X, Y];
-                    }
-                    
-                }
-            }
-            if (interactionX.Count == 0)
-            {
-                return;
-            }
-            else if (interactionX.Count == 1)
-            {
-                backgroundNoise = backgroundNoise / 120;
-
-                SpectrumEnergy.AddEnergy((Convert.ToDouble(imgData.AnodeValue[interactionX[0], interactionY[0]]) - backgroundNoise) * p1 + p2);
-            }
-            else if (interactionX.Count == 2)
-            {
-                return;
-                //if (interactionX[0] == 0 || interactionX[1] == 10 || interactionY[0] == 0 || interactionY[1] == 10)
-                //{
-                //    return;
-                //}
-                ////int xdist = Math.Abs(interactionX[0] - interactionX[1]);
-                ////int yidst = Math.Abs(interactionY[0] - interactionY[1]);
-                ////if (xdist * xdist + yidst * yidst <= 1)
-                ////{
-                ////    return;
-                ////}
-                //backgroundNoise = backgroundNoise / 119;
-
-                //SpectrumEnergy.AddEnergy((imgData.AnodeValue[interactionX[0], interactionY[0]] + imgData.AnodeValue[interactionX[1], interactionY[1]] - 2 * backgroundNoise) * p1 + p2);
-
-            }
-            //else if (interactionX.Count == 3)
-            //{
-            //    if (interactionX[0] == 0 || interactionX[1] == 10 || interactionY[0] == 0 || interactionY[1] == 10)
-            //    {
-            //        return;
-            //    }
-            //    int xdist = Math.Abs(interactionX[0] - interactionX[1]);
-            //    int yidst = Math.Abs(interactionY[0] - interactionY[1]);
-            //    if (xdist * xdist + yidst * yidst <= 1)
-            //    {
-            //        return;
-            //    }
-            //    backgroundNoise = backgroundNoise / 118;
-
-            //    SpectrumEnergy.AddEnergy((imgData.AnodeValue[interactionX[0], interactionY[0]] + imgData.AnodeValue[interactionX[1], interactionY[1]] + imgData.AnodeValue[interactionX[2], interactionY[2]] - 3 * backgroundNoise) * p1 + p2);
-
-            //}
-
+            ListModeData.Add(imgData);
             DataCountStatic++;
         }
         static int DataCountStatic = 0;
@@ -253,7 +218,7 @@ namespace SRE3021_API_test_GUI
             }
         }
 
-        static private SpectrumEnergy SpectrumEnergy = new SpectrumEnergy(3, 1500);
+        static private SpectrumEnergy SpectrumEnergy = new SpectrumEnergy(5, 2000);
 
         private ObservableCollection<HistoEnergy> spectrumHisto = new ObservableCollection<HistoEnergy>();
         public ObservableCollection<HistoEnergy> SpectrumHisto
@@ -279,64 +244,6 @@ namespace SRE3021_API_test_GUI
             }
         }
 
-
-    }
-
-    public class SpectrumEnergy
-    {
-        public List<HistoEnergy> HistoEnergies = new List<HistoEnergy>();
-
-        private List<double> EnergyBin = new List<double>();
-
-        public SpectrumEnergy(double binSize, double MaxEnergy)
-        {
-            int binCount = (int)(MaxEnergy / binSize);
-            for (int i = 0; i < binCount; ++i)
-            {
-                double energy = i * binSize;
-
-                EnergyBin.Add(energy);
-                HistoEnergies.Add(new HistoEnergy(energy));
-            }
-        }
-
-        public void AddEnergy(double energy)
-        {
-            for (int i = 0; i < EnergyBin.Count - 1; ++i)
-            {
-                if (energy < EnergyBin[i + 1] && energy > EnergyBin[i])
-                {
-                    HistoEnergies[i].Count++;
-                    break;
-                }
-            }
-        }
-        public void AddEnergy(List<double> energy)
-        {
-            foreach (double d in energy)
-            {
-                AddEnergy(d);
-            }
-        }
-
-        public void Reset()
-        {
-            foreach (var data in HistoEnergies)
-            {
-                data.Count = 0;
-            }
-        }
-    }
-
-    public class HistoEnergy
-    {
-        public double Energy { get; set; }
-        public int Count { get; set; }
-        public HistoEnergy(double energy)
-        {
-            Energy = energy;
-
-        }
 
     }
 

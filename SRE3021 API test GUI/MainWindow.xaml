@@ -65,6 +65,8 @@
             <Button Style="{StaticResource ButtonDesignHYU}" Content="Start Acqusition" Margin="5" VerticalAlignment="Center" Command="{Binding StartCZTCommmand}"/>
             <Button Style="{StaticResource ButtonDesignHYU}" Content="Stop Acqusition" Margin="5" VerticalAlignment="Center" Command="{Binding StopCZTCommmand}"/>
             <Button Style="{StaticResource ButtonDesignHYU}" Content="Reset Spectrum" Margin="5" VerticalAlignment="Center" Command="{Binding ResetSpectrumCommand}"/>
+            <TextBlock Text="Save File Name" Style="{StaticResource TextBlockContentBold}" Margin="5"/>
+            <TextBox Text="{Binding FileName}" Margin="5"/>
             <TextBlock Text="Data Count" Style="{StaticResource TextBlockContentBold}" Margin="5"/>
             <TextBlock Text="{Binding DataCount}" Margin="5"/>
             <TextBlock Text="{Binding Message}" Margin="5"/>
@@ -72,7 +74,7 @@
 
         <syncfusion:SfChart  x:Name="SpectrumMain" Margin="5" Grid.Row="1" Grid.Column="1">
             <syncfusion:SfChart.PrimaryAxis>
-                <syncfusion:NumericalAxis Minimum="0" Maximum="1500" ShowTrackBallInfo="True" Header="Energy"/>
+                <syncfusion:NumericalAxis Minimum="0" Maximum="2000" ShowTrackBallInfo="True" Header="Energy"/>
             </syncfusion:SfChart.PrimaryAxis>
             <syncfusion:SfChart.SecondaryAxis>
                 <syncfusion:LogarithmicAxis Minimum="0" Header="Count"/>
