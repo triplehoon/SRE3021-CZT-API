@@ -23,9 +23,9 @@ namespace SRE3021_API_test_GUI
             SRE3021API.InitiateSRE3021API();
 
             SRE3021API.IMGDataEventRecieved += ProcessImgDataSaving;
-            SRE3021API.ReadWriteASICReg(SRE3021ASICRegisterADDR.Anode_Channel_3_Disable, true);
+            //SRE3021API.ReadWriteASICReg(SRE3021ASICRegisterADDR.Anode_Channel_3_Disable, true);
 
-            SRE3021API.ReadWriteASICReg(SRE3021ASICRegisterADDR.Anode_Channel_1_Disable, true);
+            //SRE3021API.ReadWriteASICReg(SRE3021ASICRegisterADDR.Anode_Channel_1_Disable, true);
         }
 
         private AsyncCommand startCZTCommmand;
