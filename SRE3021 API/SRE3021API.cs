@@ -1276,6 +1276,10 @@ namespace HUREL.Compton.CZT
         /// <returns>true if success</returns>
         public static bool OpenTCPPort()
         {
+            if(!IsTCPOpen)
+            {
+                return false;
+            };
             TCPSocket = new TcpClient();
             TCPSocket.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
             LingerOption lo = new LingerOption(true, 0);
@@ -1508,7 +1512,10 @@ namespace HUREL.Compton.CZT
         }
         public static void ReadWriteASICReg(SRE3021ASICRegisterADDR addr, bool value)
         {
-            OpenTCPPort();
+            if(!OpenTCPPort())
+            {
+                return ;
+            };
 
             SRE3021PacketHeader pHeader = new SRE3021PacketHeader(SRE3021PacketType.RW_ASIC_REG, 85);
             byte[] data = new byte[82];
